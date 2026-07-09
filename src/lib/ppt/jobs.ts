@@ -23,12 +23,42 @@ interface CreatePptJobOptions {
 
 type PptJobListener = (event: PptJobEvent) => void;
 
-const jobs = new Map<string, PptJob>();
-const listeners = new Map<string, Set<PptJobListener>>();
-const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const delayTimers = new Set<ReturnType<typeof setTimeout>>();
-const retentionMsByJob = new Map<string, number>();
-const useLlmByJob = new Map<string, boolean>();
+interface PptJobStore {
+  jobs: Map<string, PptJob>;
+  listeners: Map<string, Set<PptJobListener>>;
+  cleanupTimers: Map<string, ReturnType<typeof setTimeout>>;
+  delayTimers: Set<ReturnType<typeof setTimeout>>;
+  retentionMsByJob: Map<string, number>;
+  useLlmByJob: Map<string, boolean>;
+}
+
+const globalStoreKey = Symbol.for("ppt-gen-test-v1:ppt-job-store");
+
+const getStore = (): PptJobStore => {
+  const globalWithStore = globalThis as typeof globalThis & {
+    [globalStoreKey]?: PptJobStore;
+  };
+
+  globalWithStore[globalStoreKey] ??= {
+    jobs: new Map<string, PptJob>(),
+    listeners: new Map<string, Set<PptJobListener>>(),
+    cleanupTimers: new Map<string, ReturnType<typeof setTimeout>>(),
+    delayTimers: new Set<ReturnType<typeof setTimeout>>(),
+    retentionMsByJob: new Map<string, number>(),
+    useLlmByJob: new Map<string, boolean>(),
+  };
+
+  return globalWithStore[globalStoreKey];
+};
+
+const {
+  jobs,
+  listeners,
+  cleanupTimers,
+  delayTimers,
+  retentionMsByJob,
+  useLlmByJob,
+} = getStore();
 const stepDelayMs = 35;
 const defaultRetentionMs = 5 * 60 * 1000;
 

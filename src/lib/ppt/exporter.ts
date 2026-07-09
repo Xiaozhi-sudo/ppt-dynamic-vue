@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import PptxGenJS from "pptxgenjs";
 import type { AccentElement, BoxRegion, PptTemplate, RenderedSlide } from "./types";
@@ -136,7 +136,8 @@ export async function exportPptx({
   }
 
   const filePath = path.join(outputDir, `${jobId}.pptx`);
-  await pptx.writeFile({ fileName: filePath });
+  const content = (await pptx.write({ outputType: "nodebuffer" })) as Buffer;
+  await writeFile(filePath, content);
 
   return filePath;
 }

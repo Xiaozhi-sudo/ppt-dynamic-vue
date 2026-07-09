@@ -374,6 +374,60 @@ export const getPptJob = (id: string): PptJob | undefined => {
   return job ? cloneJob(job) : undefined;
 };
 
+export const updatePptJobSlides = async (
+  id: string,
+  editedSlides: RenderedSlide[],
+): Promise<PptJob> => {
+  const job = jobs.get(id);
+  if (!job) {
+    throw new Error(`Job not found: ${id}`);
+  }
+  if (job.status !== "completed") {
+    throw new Error("只能编辑已完成的 PPT 任务");
+  }
+  if (editedSlides.length !== job.slides.length) {
+    throw new Error("编辑后的页面数量与任务页面数量不一致");
+  }
+
+  const slides = job.slides.map((slide, index) => {
+    const editedSlide = editedSlides[index];
+    if (!editedSlide || editedSlide.id !== slide.id) {
+      throw new Error(`第 ${index + 1} 页与原任务页面不匹配`);
+    }
+
+    return {
+      ...slide,
+      title: editedSlide.title,
+      subtitle: editedSlide.subtitle,
+      bullets: [...editedSlide.bullets],
+      notes: editedSlide.notes,
+    };
+  });
+  const template = getTemplateById(job.templateId);
+  if (!template) {
+    throw new Error(`未找到模板: ${job.templateId}`);
+  }
+  const downloadPath = await exportPptx({
+    slides,
+    template,
+    jobId: job.id,
+  });
+
+  return cloneJob(updateJob(
+    job,
+    {
+      status: "completed",
+      currentStep: "completed",
+      progress: 100,
+      slides,
+      downloadPath,
+      error: undefined,
+    },
+    "completed",
+    "修改已保存，可下载最新版",
+  ));
+};
+
 export const subscribeToPptJob = (
   id: string,
   listener: PptJobListener,

@@ -122,3 +122,10 @@ export interface CreateJobResponse {
   jobId?: string;
   error?: string;
 }
+
+export interface UpdateJobResponse {
+  job?: {
+    slides?: RenderedSlide[];
+  };
+  error?: string;
+}

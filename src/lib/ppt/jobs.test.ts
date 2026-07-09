@@ -5,6 +5,7 @@ import {
   getPptJob,
   getPptJobListenerCountForTests,
   subscribeToPptJob,
+  updatePptJobSlides,
 } from "./jobs";
 import type { PptJob } from "./types";
 
@@ -186,6 +187,40 @@ describe("ppt jobs", () => {
     expect(stored?.status).toBe("completed");
     expect(stored?.progress).toBe(100);
     expect(stored?.slides).toHaveLength(6);
+  });
+
+  it("updates completed job text fields and refreshes the pptx download path", async () => {
+    const job = createPptJob({
+      topic: "智能制造趋势",
+      templateId: "business-blue",
+      useLlm: false,
+    });
+    const completed = await waitForJob(
+      job.id,
+      (candidate) => candidate?.status === "completed",
+    );
+    if (!completed) throw new Error("job did not complete");
+
+    const editedSlides = completed.slides.map((slide, index) =>
+      index === 0
+        ? {
+            ...slide,
+            title: "编辑后的封面标题",
+            subtitle: "编辑后的副标题",
+            bullets: ["编辑后的要点"],
+            notes: "编辑后的备注",
+          }
+        : slide,
+    );
+
+    const updated = await updatePptJobSlides(job.id, editedSlides);
+
+    expect(updated.slides[0].title).toBe("编辑后的封面标题");
+    expect(updated.slides[0].subtitle).toBe("编辑后的副标题");
+    expect(updated.slides[0].bullets).toEqual(["编辑后的要点"]);
+    expect(updated.slides[0].notes).toBe("编辑后的备注");
+    expect(updated.downloadPath).toContain(`${job.id}.pptx`);
+    expect(getPptJob(job.id)?.slides[0].title).toBe("编辑后的封面标题");
   });
 
   it("cleans terminal jobs and listeners after retention", async () => {

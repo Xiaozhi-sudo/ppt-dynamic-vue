@@ -82,4 +82,30 @@ describe("SlidePreview", () => {
     expect(wrapper.find("[data-active-bullet='true']").exists()).toBe(false);
     expect(wrapper.find(".is-filling").exists()).toBe(false);
   });
+
+  it("emits inline text edits from the large preview canvas", async () => {
+    const wrapper = mount(SlidePreview, {
+      props: {
+        editable: true,
+        mode: "large",
+        slide: createSlide(),
+      },
+    });
+
+    const title = wrapper.get("[data-testid='inline-title-editor']");
+    title.element.textContent = "页面直接编辑标题";
+    await title.trigger("input");
+
+    const subtitle = wrapper.get("[data-testid='inline-subtitle-editor']");
+    subtitle.element.textContent = "页面直接编辑副标题";
+    await subtitle.trigger("input");
+
+    const bullet = wrapper.get("[data-testid='inline-bullet-editor-0']");
+    bullet.element.textContent = "页面直接编辑要点";
+    await bullet.trigger("input");
+
+    expect(wrapper.emitted("update-title")).toEqual([["页面直接编辑标题"]]);
+    expect(wrapper.emitted("update-subtitle")).toEqual([["页面直接编辑副标题"]]);
+    expect(wrapper.emitted("update-bullet")).toEqual([[0, "页面直接编辑要点"]]);
+  });
 });

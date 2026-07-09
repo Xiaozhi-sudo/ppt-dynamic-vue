@@ -42,12 +42,15 @@
           {{ generateLabel }}
         </button>
         <a
-          v-if="status === 'completed' && jobId"
+          v-if="status === 'completed' && jobId && !hasUnsavedEdits"
           class="download-action"
           :href="`/api/ppt/jobs/${jobId}/download`"
         >
           下载 PPTX
         </a>
+        <span v-else-if="status === 'completed' && hasUnsavedEdits" class="download-action is-disabled">
+          保存后下载
+        </span>
       </div>
 
       <GenerationTimeline
@@ -72,8 +75,12 @@
           v-if="activeSlide"
           active
           :animation="activeSlideAnimation"
+          :editable="canEditActiveSlide"
           mode="large"
           :slide="activeSlide"
+          @update-title="updateActiveSlideText('title', $event)"
+          @update-subtitle="updateActiveSlideText('subtitle', $event)"
+          @update-bullet="updateActiveSlideBullet"
         />
         <div v-else class="empty-preview">
           <span>16:9</span>
@@ -93,6 +100,41 @@
           />
         </div>
       </div>
+
+      <section v-if="canEditActiveSlide" class="slide-editor" aria-label="编辑当前幻灯片">
+        <div class="slide-editor__header">
+          <div>
+            <span class="eyebrow">编辑当前页</span>
+            <h3>第 {{ activeSlideIndex + 1 }} 页文案</h3>
+          </div>
+          <span v-if="editMessage" class="edit-status">{{ editMessage }}</span>
+        </div>
+
+        <p class="editor-hint">点击预览页里的标题、副标题或要点即可直接修改。</p>
+
+        <label class="editor-field" for="slide-notes-editor">
+          <span>备注</span>
+          <textarea
+            id="slide-notes-editor"
+            :value="activeSlide?.notes ?? ''"
+            rows="3"
+            @input="updateActiveSlideText('notes', ($event.target as HTMLTextAreaElement).value)"
+          />
+        </label>
+
+        <div class="editor-actions">
+          <p v-if="editError" class="editor-error">{{ editError }}</p>
+          <button
+            data-testid="save-slide-edits"
+            class="primary-action primary-action--compact"
+            :disabled="!hasUnsavedEdits || isSavingEdits"
+            type="button"
+            @click="handleSaveSlideEdits"
+          >
+            {{ isSavingEdits ? "保存中..." : "保存修改" }}
+          </button>
+        </div>
+      </section>
     </section>
   </main>
 </template>
@@ -110,6 +152,7 @@ import type {
   PptTemplate,
   RenderedSlide,
   TemplatesResponse,
+  UpdateJobResponse,
   WorkspaceStatus,
 } from "@/frontend/types/ppt";
 
@@ -133,6 +176,10 @@ const terminal = ref(false);
 const isSubmitting = ref(false);
 const eventSource = ref<EventSource>();
 const retryTimer = ref<ReturnType<typeof setTimeout>>();
+const hasUnsavedEdits = ref(false);
+const isSavingEdits = ref(false);
+const editMessage = ref<string>();
+const editError = ref<string>();
 
 let disposed = false;
 
@@ -144,6 +191,9 @@ const activeSlide = computed(
 );
 const activeSlideAnimation = computed(() =>
   animation.value?.slideIndex === activeSlide.value?.index ? animation.value : undefined,
+);
+const canEditActiveSlide = computed(
+  () => status.value === "completed" && Boolean(activeSlide.value),
 );
 const isGenerating = computed(
   () => status.value === "queued" || status.value === "running",
@@ -159,6 +209,37 @@ const generateLabel = computed(() => {
   if (status.value === "failed") return "重新生成";
   return "生成 PPT";
 });
+
+const replaceActiveSlide = (updater: (slide: RenderedSlide) => RenderedSlide) => {
+  const targetSlide = activeSlide.value;
+  if (!targetSlide) return;
+
+  slides.value = slides.value.map((slide) =>
+    slide.id === targetSlide.id ? updater(slide) : slide,
+  );
+  hasUnsavedEdits.value = true;
+  editMessage.value = undefined;
+  editError.value = undefined;
+};
+
+const updateActiveSlideText = (
+  field: "title" | "subtitle" | "notes",
+  value: string,
+) => {
+  replaceActiveSlide((slide) => ({
+    ...slide,
+    [field]: value,
+  }));
+};
+
+const updateActiveSlideBullet = (bulletIndex: number, value: string) => {
+  replaceActiveSlide((slide) => ({
+    ...slide,
+    bullets: slide.bullets.map((bullet, index) =>
+      index === bulletIndex ? value : bullet,
+    ),
+  }));
+};
 
 const closeEventSource = () => {
   eventSource.value?.close();
@@ -199,6 +280,9 @@ const openEventSource = (id: string, retryCount = 0) => {
 
       if (event.slides) {
         slides.value = event.slides;
+        hasUnsavedEdits.value = false;
+        editMessage.value = undefined;
+        editError.value = undefined;
         activeSlideIndex.value = event.animation
           ? event.animation.slideIndex
           : activeSlideIndex.value < event.slides.length
@@ -241,6 +325,9 @@ const handleGenerate = async () => {
 
   isSubmitting.value = true;
   error.value = undefined;
+  editMessage.value = undefined;
+  editError.value = undefined;
+  hasUnsavedEdits.value = false;
   slides.value = [];
   activeSlideIndex.value = 0;
   progress.value = 0;
@@ -275,6 +362,42 @@ const handleGenerate = async () => {
     isSubmitting.value = false;
     error.value =
       createError instanceof Error ? createError.message : "创建生成任务失败。";
+  }
+};
+
+const handleSaveSlideEdits = async () => {
+  if (!jobId.value || !hasUnsavedEdits.value || isSavingEdits.value) return;
+
+  isSavingEdits.value = true;
+  editError.value = undefined;
+  editMessage.value = undefined;
+
+  try {
+    const response = await fetch(`/api/ppt/jobs/${jobId.value}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        slides: slides.value,
+      }),
+    });
+    const data = (await response.json()) as UpdateJobResponse;
+
+    if (!response.ok) {
+      throw new Error(data.error ?? "保存修改失败。");
+    }
+
+    if (data.job?.slides) {
+      slides.value = data.job.slides;
+    }
+    hasUnsavedEdits.value = false;
+    editMessage.value = "修改已保存";
+    currentMessage.value = "修改已保存，可下载最新版";
+  } catch (saveError) {
+    editError.value = saveError instanceof Error ? saveError.message : "保存修改失败。";
+  } finally {
+    isSavingEdits.value = false;
   }
 };
 

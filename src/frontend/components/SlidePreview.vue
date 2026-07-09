@@ -28,18 +28,26 @@ const props = withDefaults(
     active?: boolean;
     animation?: PptFillAnimation;
     selectable?: boolean;
+    editable?: boolean;
   }>(),
   {
     mode: "large",
     active: false,
     selectable: false,
+    editable: false,
   },
 );
 
 const emit = defineEmits<{
   select: [];
+  "update-title": [value: string];
+  "update-subtitle": [value: string];
+  "update-bullet": [bulletIndex: number, value: string];
 }>();
 
+const canEditInline = computed(
+  () => props.editable && props.mode === "large" && !props.selectable,
+);
 const liveAnimation = computed(() =>
   props.mode === "large" ? props.animation : undefined,
 );
@@ -61,6 +69,16 @@ const toAccentStyle = (accentElement: AccentElement) => ({
   backgroundColor: accentElement.color,
   opacity: accentElement.opacity ?? 1,
 });
+
+const getEditableText = (event: Event): string =>
+  ((event.currentTarget as HTMLElement).textContent ?? "").trim();
+
+const stopMultilineKey = (event: KeyboardEvent) => {
+  if (event.key !== "Enter") return;
+
+  event.preventDefault();
+  (event.currentTarget as HTMLElement).blur();
+};
 
 const SlideCanvas = defineComponent({
   name: "SlideCanvas",
@@ -96,7 +114,14 @@ const SlideCanvas = defineComponent({
             "div",
             {
               class: ["slide-title", { "is-filling": activeField.value === "title" }],
+              contenteditable: canEditInline.value ? "plaintext-only" : undefined,
+              "data-testid": canEditInline.value ? "inline-title-editor" : undefined,
+              role: canEditInline.value ? "textbox" : undefined,
               style: toRegionStyle(layout.titleBox),
+              onInput: canEditInline.value
+                ? (event: Event) => emit("update-title", getEditableText(event))
+                : undefined,
+              onKeydown: canEditInline.value ? stopMultilineKey : undefined,
             },
             props.slide.title
               ? props.slide.title
@@ -110,10 +135,19 @@ const SlideCanvas = defineComponent({
                     "slide-subtitle",
                     { "is-filling": activeField.value === "subtitle" },
                   ],
+                  contenteditable: canEditInline.value ? "plaintext-only" : undefined,
+                  "data-testid": canEditInline.value
+                    ? "inline-subtitle-editor"
+                    : undefined,
+                  role: canEditInline.value ? "textbox" : undefined,
                   style: {
                     ...toRegionStyle(layout.subtitleBox),
                     color: colors.mutedText,
                   },
+                  onInput: canEditInline.value
+                    ? (event: Event) => emit("update-subtitle", getEditableText(event))
+                    : undefined,
+                  onKeydown: canEditInline.value ? stopMultilineKey : undefined,
                 },
                 props.slide.subtitle
                   ? props.slide.subtitle
@@ -142,7 +176,17 @@ const SlideCanvas = defineComponent({
                         },
                         "data-active-bullet":
                           activeBulletIndex.value === index ? "true" : undefined,
+                        contenteditable: canEditInline.value ? "plaintext-only" : undefined,
+                        "data-testid": canEditInline.value
+                          ? `inline-bullet-editor-${index}`
+                          : undefined,
+                        role: canEditInline.value ? "textbox" : undefined,
                         key: `${props.slide.id}-bullet-${index}`,
+                        onInput: canEditInline.value
+                          ? (event: Event) =>
+                              emit("update-bullet", index, getEditableText(event))
+                          : undefined,
+                        onKeydown: canEditInline.value ? stopMultilineKey : undefined,
                       },
                       bullet,
                     ),

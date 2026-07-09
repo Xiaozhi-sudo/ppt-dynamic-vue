@@ -37,7 +37,8 @@ body {
 }
 
 button,
-textarea {
+textarea,
+input {
   font: inherit;
 }
 
@@ -48,7 +49,8 @@ a {
 
 button:focus-visible,
 a:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+input:focus-visible {
   outline: 3px solid rgba(15, 118, 110, 0.3);
   outline-offset: 2px;
 }
@@ -297,6 +299,32 @@ button:disabled {
   border: 1px solid var(--success);
   background: #e7f4ec;
   color: var(--success);
+}
+
+.download-action.is-disabled {
+  border-color: #c8cec9;
+  background: #edf0ed;
+  color: #6f7b74;
+}
+
+.primary-action--compact {
+  flex: 0 0 auto;
+  min-width: 120px;
+}
+
+.secondary-action {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 11px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.secondary-action:hover {
+  border-color: var(--accent);
 }
 
 .generation-timeline {
@@ -551,6 +579,33 @@ button:disabled {
   box-shadow: 0 0 0 6px rgba(15, 118, 110, 0.1);
 }
 
+.slide-title[contenteditable],
+.slide-subtitle[contenteditable],
+.slide-bullets li[contenteditable] {
+  cursor: text;
+  border-radius: 4px;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.slide-title[contenteditable]:hover,
+.slide-subtitle[contenteditable]:hover,
+.slide-bullets li[contenteditable]:hover {
+  background: rgba(255, 253, 248, 0.42);
+  box-shadow: 0 0 0 5px rgba(15, 118, 110, 0.09);
+}
+
+.slide-title[contenteditable]:focus,
+.slide-subtitle[contenteditable]:focus,
+.slide-bullets li[contenteditable]:focus {
+  outline: none;
+  background: rgba(255, 253, 248, 0.76);
+  box-shadow:
+    0 0 0 2px rgba(15, 118, 110, 0.5),
+    0 8px 20px rgba(35, 45, 41, 0.12);
+}
+
 .slide-placeholder,
 .slide-bullet-placeholders span {
   position: relative;
@@ -699,6 +754,82 @@ button:disabled {
   border-color: var(--accent);
 }
 
+.slide-editor {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.slide-editor__header,
+.editor-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.slide-editor__header h3 {
+  margin: 3px 0 0;
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.edit-status {
+  flex: 0 0 auto;
+  border: 1px solid rgba(33, 115, 70, 0.22);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: #e7f4ec;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.editor-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.editor-field input,
+.editor-field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  background: rgba(255, 253, 248, 0.92);
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.editor-field textarea {
+  resize: vertical;
+}
+
+.editor-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.editor-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 @media (max-width: 940px) {
   .workspace-shell {
     grid-template-columns: 1fr;
@@ -711,6 +842,10 @@ button:disabled {
 
   .brand-block h1 {
     font-size: 24px;
+  }
+
+  .editor-grid {
+    grid-template-columns: 1fr;
   }
 }
 
